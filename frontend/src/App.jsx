@@ -208,11 +208,25 @@ export default function App() {
   // Action: Export CSV
   const handleExportCSV = () => {
     try {
+      const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
       const headers = ['Employee Code', 'Employee Name', 'Role', 'Pod']
+
       for (let day = 1; day <= 30; day++) {
-        headers.push(`2026-11-${String(day).padStart(2, '0')}`)
+        const d = new Date(2026, 10, day)
+        const wk = weekdayNames[d.getDay()]
+        // Format as "Nov 01 (Sun)" so Excel treats it as clean text and never displays "########"
+        headers.push(`"Nov ${String(day).padStart(2, '0')} (${wk})"`)
       }
       headers.push('Total Working', 'Total Off', 'Total Leave')
+
+      // Clean, industry-standard 1-2 letter shift codes for readable CSV matrix
+      const shortCodes = {
+        WORKING: 'W',
+        WEEKLY_OFF: 'WO',
+        PUBLIC_HOLIDAY: 'PH',
+        LEAVE: 'LV',
+        COMP_OFF: 'CO'
+      }
 
       const rows = employees.map((emp) => {
         const row = [emp.emp_code, `"${emp.name}"`, emp.role, `"${emp.pod_name || ''}"`]
@@ -222,8 +236,9 @@ export default function App() {
           const dateStr = `2026-11-${String(day).padStart(2, '0')}`
           const entry = rosterEntries.find((r) => r.employee_id === emp.id && r.date === dateStr)
           const status = entry ? entry.status : 'N/A'
-          const backup = entry?.backup_for_brand_name ? ` (BK:${entry.backup_for_brand_name})` : ''
-          row.push(`"${status}${backup}"`)
+          const code = shortCodes[status] || status
+          const backup = entry?.backup_for_brand_name ? ` [BK:${entry.backup_for_brand_name}]` : ''
+          row.push(`"${code}${backup}"`)
 
           if (status === 'WORKING') work++
           else if (status === 'WEEKLY_OFF' || status === 'PUBLIC_HOLIDAY') off++
