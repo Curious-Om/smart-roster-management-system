@@ -18,15 +18,16 @@ The system strictly enforces the architectural separation between **Brand Operat
 4. [Local Setup & Run Instructions](#4-local-setup--run-instructions)
 5. [Documented Operational Assumptions](#5-documented-operational-assumptions)
 6. [API Specifications](#6-api-specifications)
-7. [Section 8: "Tell Us How You Think" — Complete Architectural Answers](#7-section-8-tell-us-how-you-think--complete-architectural-answers)
-   - [Q1: Modeling Employees, Brands, Processes, Pods, and Relationships](#q1-how-did-you-model-employees-brands-processes-pods-and-their-relationships)
-   - [Q2: Roster Generation & Constraint Satisfaction Engine](#q2-how-does-your-system-generate-a-roster-and-determine-whether-it-satisfies-the-required-constraints)
-   - [Q3: Single-Resource (80%) vs. Multi-Resource (20%) Brands](#q3-how-did-you-handle-the-difference-between-single-resource-brands-and-brands-with-multiple-employees)
-   - [Q4: Sole Employee Unavailability on Single-Resource Brands](#q4-what-happens-when-an-employee-manages-all-processes-for-a-brand-but-is-unavailable-on-a-required-working-day)
-   - [Q5: Conflicting Requirements or Insufficient Staffing](#q5-how-does-your-system-handle-conflicting-requirements-or-insufficient-staffing)
-   - [Q6: Automation vs. Human Control](#q6-which-parts-of-the-process-did-you-automate-and-which-did-you-leave-under-human-control-why)
-   - [Q7: Scaling to Doubled Team and Brand Count](#q7-if-the-company-doubled-its-team-and-brand-count-what-would-you-change-about-your-solution)
-   - [Q8: Improvements with One Additional Week](#q8-if-you-had-one-additional-week-to-work-on-this-what-would-you-improve-first)
+7. [Engineering Deep-Dive & System Design Decisions](#7-engineering-deep-dive--system-design-decisions)
+   - [1. Entity & Relationship Modeling (Employees, Brands, Pods)](#1-entity--relationship-modeling-employees-brands-processes-and-pods)
+   - [2. Deterministic Constraint Satisfaction Engine](#2-deterministic-constraint-satisfaction-roster-generation--validation-engine)
+   - [3. Handling 80% Single-Resource vs. 20% Multi-Resource Brands](#3-solving-the-8020-structural-problem-single-resource-vs-multi-resource-brands)
+   - [4. Single-Resource Absence & Pod-Based Backup Dispatch](#4-single-resource-absence-1-click-pod-backup-recommendation-engine)
+   - [5. Constraint Hierarchy & Resolving Headcount Shortages](#5-constraint-hierarchy-handling-clashing-preferences--headcount-deficits)
+   - [6. Automation vs. Human-in-the-Loop Operations](#6-automation-boundaries-what-to-automate-vs-what-to-keep-human-in-the-loop)
+   - [7. Scaling the System (10x Team & Brand Expansion)](#7-scaling-the-architecture-expanding-to-300-employees-and-100-brands)
+   - [8. Future Technical Roadmap](#8-future-roadmap-high-impact-technical-improvements)
+8. [Author & License](#8-author--license)
 
 ---
 
@@ -240,11 +241,11 @@ python test_module4.py
 
 ---
 
-## 7. Section 8: "Tell Us How You Think" — Complete Architectural Answers
+## 7. Engineering Deep-Dive & System Design Decisions
 
-### Q1: How did you model employees, brands, processes, pods, and their relationships?
+### 1. Entity & Relationship Modeling: Employees, Brands, Processes, and Pods
 
-When I first read the problem statement, my biggest takeaway was that you can't just treat this like a simple Google Calendar or a basic employee shift table. In a real operations setup, client contracts and operating requirements are completely separate from who actually shows up to do the work. If you mix the two together, the moment someone takes a sick leave, your entire schedule definition breaks.
+When I first started architecting this system, my biggest takeaway was that you can't just treat this like a simple Google Calendar or a basic employee shift table. In a real operations setup, client contracts and operating requirements are completely separate from who actually shows up to do the work. If you mix the two together, the moment someone takes a sick leave, your entire schedule definition breaks.
 
 So in my database schema (`backend/models.py`), I intentionally broke this down into a few distinct relational pieces:
 
@@ -279,7 +280,7 @@ This separation makes everything so much cleaner to maintain. If an employee tak
 
 ---
 
-### Q2: How does your system generate a roster and determine whether it satisfies the required constraints?
+### 2. Deterministic Constraint Satisfaction: Roster Generation & Validation Engine
 
 For generating the monthly roster (`backend/services/scheduler.py`), I went with a clean, deterministic 4-step pipeline rather than some random or black-box solver. In real operations, managers need schedules to be 100% predictable and reproducible.
 
@@ -315,9 +316,9 @@ Then it checks for 6 specific conflict types:
 
 ---
 
-### Q3: How did you handle the difference between single-resource brands and brands with multiple employees?
+### 3. Solving the 80/20 Structural Problem: Single-Resource vs. Multi-Resource Brands
 
-This was honestly the core puzzle of the assignment. Single-resource and multi-resource brands have fundamentally different operational dynamics:
+This was honestly the core operational puzzle of the system. Single-resource and multi-resource brands have fundamentally different operational dynamics:
 
 #### 1. Single-Resource Brands (80% / 16 Brands)
 In our dataset, 16 brands are run by a single dedicated agent who handles CS, ACC, and NDR (split roughly 34%/33%/33% capacity).
@@ -331,7 +332,7 @@ For the 4 high-volume brands (like NykaaLuxe D2C or BoatAudio Care), we have 2 t
 
 ---
 
-### Q4: What happens when an employee manages all processes for a brand but is unavailable on a required working day?
+### 4. Single-Resource Absence: 1-Click Pod Backup Recommendation Engine
 
 This is the classic nightmare scenario for an operations manager: the sole person running a brand takes sick leave or planned time off, leaving the client completely stranded.
 
@@ -348,7 +349,7 @@ Here is how my application handles this end-to-end:
 
 ---
 
-### Q5: How does your system handle conflicting requirements or insufficient staffing?
+### 5. Constraint Hierarchy: Handling Clashing Preferences & Headcount Deficits
 
 Whenever requirements clash or headcount falls short, I enforced a very strict rule: **mandatory client SLA coverage always beats personal employee preference.**
 
@@ -370,7 +371,7 @@ Priority 5 (Soft Warning):   Employee Preferred Weekly Off Day
 
 ---
 
-### Q6: Which parts of the process did you automate, and which did you leave under human control? Why?
+### 6. Automation Boundaries: What to Automate vs. What to Keep Human-in-the-Loop
 
 I tried to be very pragmatic about what software does best versus what actually requires human judgment in a fast-paced ops team.
 
@@ -386,7 +387,7 @@ I tried to be very pragmatic about what software does best versus what actually 
 
 ---
 
-### Q7: If the company doubled its team and brand count, what would you change about your solution?
+### 7. Scaling the Architecture: Expanding to 300+ Employees and 100+ Brands
 
 If the company doubled to 64 people or expanded to 300+ people and 100+ brands, here is how I'd evolve the architecture:
 
@@ -402,9 +403,9 @@ If the company doubled to 64 people or expanded to 300+ people and 100+ brands, 
 
 ---
 
-### Q8: If you had one additional week to work on this, what would you improve first?
+### 8. Future Roadmap: High-Impact Technical Improvements
 
-If I had one more week, these are the 4 features I would build next:
+If I were expanding this project into an enterprise SaaS platform, these are the 4 features I would build next:
 
 1. **Shift-Level Rotations (24/7 Support)**: Currently, the system works at a daily calendar grain (an employee either works or is off on date $d$). High-growth D2C brands often need 24/7 CS coverage with Morning (08:00–16:00), Evening (16:00–00:00), and Night (00:00–08:00) shifts, plus enforcing mandatory 12-hour rest periods between shifts. Moving from daily to shift granularity would be my top priority.
 2. **Predictive SLA Risk Index (Monte Carlo Simulation)**: I'd build an analytics module that analyzes historical unplanned absence rates per employee and pod. Before the month even begins, it could flag vulnerable single-resource brands with a "High SLA Risk" score, helping the manager proactively reserve floater capacity.
@@ -414,6 +415,7 @@ If I had one more week, these are the 4 features I would build next:
 
 ---
 
-## 8. License & Acknowledgments
-Built for the **Datastraw Senior Full-Stack Engineering Assessment**.
+## 8. Author & License
+Designed and developed by **Om Mishra** as a production-grade full-stack system showcase demonstrating deterministic scheduling, real-time SLA conflict detection, and operational automation for multi-brand D2C support teams.
+
 Licensed under the [MIT License](LICENSE).

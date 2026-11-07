@@ -1,4 +1,4 @@
-# SPEC.md — Smart Roster Management System (Datastraw Assessment)
+# SPEC.md — Smart Roster Management System Specification
 
 ## 1. System Overview
 An enterprise D2C Operations Roster Management System that plans, generates, validates, and manages monthly schedules for 32+ employees across 20 D2C brands, 4 operational processes, and 3 pods.
